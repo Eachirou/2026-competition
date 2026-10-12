@@ -8,6 +8,7 @@ This package holds the code shared by all four executable track benchmarks:
 | `data.py` | device-aware loaders, tensor conversion, and resampling helpers |
 | `nb_task.py` | bridge from track datasets to the NeuralBench task and data layer |
 | `metrics.py` | shared metric implementations |
+| `streaming.py` | streamed, causal evaluation of Tracks 02 and 03: one window at a time, each stream on a fresh copy of the model |
 | `baselines.py` | small reusable constant and linear baseline models |
 | `linear_probe.py` | reusable frozen-encoder probe machinery |
 
