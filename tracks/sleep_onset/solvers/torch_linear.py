@@ -44,8 +44,13 @@ class Solver(CompetSolver):
 
     def load_model(self, meta):
         model = TorchLinear(n_chans=meta["n_chans"]).to(self.device)
+        # A submitted model ships the state dict written by ``save_model``,
+        # which inference-only runs (the platform's) load. A training run
+        # (``self.train_loader`` is set) starts from scratch instead: weights
+        # an earlier run left in ``outputs/<name>/`` may not fit this run's
+        # data, and would warm-start its training.
         weights = meta["submission_dir"] / "weights.pt"
-        if weights.exists():
+        if weights.exists() and self.train_loader is None:
             model.load_state_dict(
                 torch.load(weights, map_location=self.device))
         return model
