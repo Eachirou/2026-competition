@@ -239,6 +239,24 @@ class _NBWindows(torch.utils.data.Dataset):
         return X, y, info
 
 
+def _window_sfreq(frequency, n_times, duration):
+    """Sampling rate of a task's windows, in Hz.
+
+    The neuro extractor's ``frequency``, or, when the task keeps each
+    recording's own rate (``frequency: native``, e.g. Track 3's Muse data),
+    the rate read off a window: its ``n_times`` samples over its
+    ``duration`` in seconds.
+    """
+    if frequency != "native":
+        return float(frequency)
+    if not duration:
+        raise ValueError(
+            "a task at its native rate needs a window duration to give its "
+            "sampling rate"
+        )
+    return n_times / float(duration)
+
+
 def _make_loaders(loaders, device, target_transform):
     """Rebuild the competition loaders from the neuralbench ones.
 
@@ -337,7 +355,8 @@ def load_task(modality, task, *, data_dir, dataset=None, device="cpu",
     ch_names = _channel_names(nb_loaders["test"].dataset)
     neuro = nb_loaders["test"].dataset.extractors["neuro"]
     meta = dict(
-        sfreq=float(neuro.frequency),
+        sfreq=_window_sfreq(neuro.frequency, X0.shape[-1],
+                            cfg.get("duration")),
         ch_names=ch_names,
         chs_info=chs_info_from_names(ch_names),
         n_chans=int(X0.shape[-2]),

@@ -24,5 +24,6 @@ moabb
 mne
 # Used by the EEGNet baselines / many torch submissions:
 braindecode
-# Sleep-EDF's prepare() shells out to it for PhysioNet's S3 mirror.
-awscli
+# NeuralFetch downloads the PROTEUS and Muse releases from NEMAR through it,
+# importing it on demand (the neuroai packages do not depend on it).
+nemar-py>=0.3.1

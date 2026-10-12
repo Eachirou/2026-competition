@@ -1,14 +1,19 @@
-"""BCI-decoding studies through the official neuralbench task pipeline.
+"""BCI-decoding studies through neuralbench's streamed Track 2 task.
 
-Wraps the neuralbench ``eeg/motor_imagery`` task config (study, subject-level
-split, 4-s stimulus windows, one-hot labels) — see ``benchmark_utils.nb_task``.
-The ``study`` parameter picks the dataset overlay:
+Wraps the neuralbench ``eeg/_motor_imagery_stream`` task config (study,
+subject-level split, 4-s cued windows, one-hot labels; the signal
+notch-filtered at 50 and 60 Hz, band-pass filtered at 0.1-75 Hz, resampled
+to 120 Hz and kept in microvolts, with no scaling or clamping) — see
+``benchmark_utils.nb_task``. The ``study`` parameter picks the dataset
+variant:
 
-- ``dreyer2023``     : Dreyer2023Large — the warm-up evaluation study
-                       (2-class, predefined train/test subjects); the default.
-- ``stieger2021``    : Stieger2021Continuous — additional public proxy
-                       (62 subjects, 4-class; large download).
-- ``tangermann2012`` : BNCI2014_001 — small, handy for real-data smoke tests.
+- ``dreyer2026proteus`` : Dreyer2026Proteus — the PROTEUS training release
+                          (NEMAR nm000290 v1.0.0: 41 EEG channels, three
+                          cued commands, one window from 1 s after each
+                          cue), the task default and the warm-up evaluation
+                          study; the default.
+- ``tangermann2012``    : BNCI2014_001 — small, handy for real-data smoke
+                          tests.
 
 Requires a one-time download (``benchopt prepare``); the zero-dependency
 ``Simulated`` dataset covers no-network smoke testing.
@@ -25,11 +30,12 @@ import neuralbench  # noqa: F401
 from benchmark_utils.data import get_device
 from benchmark_utils.nb_task import download_study, load_task, require_prepared
 
+TASK = "_motor_imagery_stream"
+
 # Overlay yaml in the task's ``datasets/`` folder (None = the task default).
 _OVERLAYS = {
-    "stieger2021": None,
+    "dreyer2026proteus": None,
     "tangermann2012": "tangermann2012",
-    "dreyer2023": "dreyer2023",
 }
 
 
@@ -43,19 +49,21 @@ class Dataset(BaseDataset):
         "pip::neuralfetch==0.4.0",
         "pip::neuraltrain==0.4.0",
         "pip::neuralbench==0.4.0",
-        "pip::moabb", "pip::mne", "scikit-learn",
+        # The PROTEUS release downloads from NEMAR through NeuralFetch;
+        # BNCI2014_001 through MOABB.
+        "pip::nemar-py>=0.3.1", "pip::moabb", "pip::mne", "scikit-learn",
     ]
 
     parameters = {
-        "study": ["dreyer2023"],
+        "study": ["dreyer2026proteus"],
         "batch_size": [64],
         # Dataloader workers; 0 extracts windows in-process, which is what
         # shared CI/platform runners want. Raise it from the phase config
         # (``BCI[num_workers=4]``) on a worker with spare cores.
         "num_workers": [0],
-        # "test" restricts the study to its test split (worker staging /
-        # evaluation-only runs; incompatible with the objective's
-        # training=True) — see benchmark_utils.nb_task.
+        # "test" would restrict the study to its test split, which only a
+        # PredefinedSplit supports (see benchmark_utils.nb_task): the stream
+        # task draws its split at runtime, so the warm-up stages "full".
         "subset": ["full"],
     }
 
@@ -72,7 +80,7 @@ class Dataset(BaseDataset):
         # (filtering, segmenting, targets) caches next to the data, so runs
         # only touch warm caches. Both steps are idempotent.
         download_study(
-            "eeg", "motor_imagery", self._data_dir(),
+            "eeg", TASK, self._data_dir(),
             dataset=_OVERLAYS[self.study],
         )
         self._load()
@@ -84,7 +92,7 @@ class Dataset(BaseDataset):
 
     def _load(self, device="cpu"):
         return load_task(
-            "eeg", "motor_imagery",
+            "eeg", TASK,
             data_dir=self._data_dir(),
             dataset=_OVERLAYS[self.study],
             device=device,
@@ -99,7 +107,7 @@ class Dataset(BaseDataset):
     def get_data(self):
         # Load already-prepared data only; downloading + extracting is the
         # explicit ``prepare`` step (``benchopt prepare`` / ``--prepare``).
-        require_prepared("eeg", "motor_imagery", self._data_dir(),
+        require_prepared("eeg", TASK, self._data_dir(),
                          dataset=_OVERLAYS[self.study])
         loaders, meta = self._load(device=get_device())
         return dict(

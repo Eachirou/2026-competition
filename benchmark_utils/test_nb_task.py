@@ -4,12 +4,12 @@ Run with ``pytest benchmark_utils``.
 
 The loading pipeline itself needs the neuralbench stack and real data — it is
 validated on the cluster; these tests cover the subset-filter composition,
-which is plain dict/string logic.
+which is plain dict/string logic, and the windows' sampling rate.
 """
 
 import pytest
 
-from benchmark_utils.nb_task import build_test_only_filter
+from benchmark_utils.nb_task import _window_sfreq, build_test_only_filter
 
 
 def test_predefined_split_with_query_and_existing_filter():
@@ -58,3 +58,17 @@ def test_runtime_split_is_rejected():
 def test_missing_split_is_rejected():
     with pytest.raises(ValueError, match="PredefinedSplit"):
         build_test_only_filter({"study": {}, "trigger_event_type": "Stimulus"})
+
+
+def test_window_sfreq_is_the_extractor_rate():
+    assert _window_sfreq(120.0, 480, 4.0) == 120.0
+
+
+def test_window_sfreq_at_native_rate_is_read_off_the_window():
+    # Muse: 5-s windows of 640 samples at the recorded 128 Hz.
+    assert _window_sfreq("native", 640, 5.0) == 128.0
+
+
+def test_window_sfreq_at_native_rate_needs_a_duration():
+    with pytest.raises(ValueError, match="duration"):
+        _window_sfreq("native", 640, None)
