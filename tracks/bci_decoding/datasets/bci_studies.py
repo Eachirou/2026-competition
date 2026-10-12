@@ -15,6 +15,13 @@ variant:
 - ``tangermann2012``    : BNCI2014_001 — small, handy for real-data smoke
                           tests.
 
+The test split is streamed one session of one participant at a time
+(``data.stream_by: [subject, session]``), each window's ``info`` giving its
+session (``stream_id``) and, on PROTEUS, its context, the interface of its
+run (Graz or BrainHero), which the objective scores separately within each
+session. On PROTEUS, a session's runs come in acquisition order, their BIDS
+run numbers.
+
 Requires a one-time download (``benchopt prepare``); the zero-dependency
 ``Simulated`` dataset covers no-network smoke testing.
 """
@@ -37,6 +44,42 @@ _OVERLAYS = {
     "dreyer2026proteus": None,
     "tangermann2012": "tangermann2012",
 }
+
+# PROTEUS runs by BIDS task -> the interface they used, the context of the
+# subject x session x context cells. Baseline runs hold no cue, so no window.
+_PROTEUS_INTERFACES = {
+    "AcquisitionBH": "BrainHero",
+    "OnlineRawBH": "BrainHero",
+    "AcquisitionGraz": "Graz",
+    "OnlineRawGraz": "Graz",
+}
+
+
+def _proteus_interface(trigger):
+    """Interface (Graz or BrainHero) of the run a PROTEUS window comes from."""
+    task = trigger.get("task")
+    if task not in _PROTEUS_INTERFACES:
+        raise ValueError(f"PROTEUS run with unknown task {task!r}: its "
+                         "interface, the window's context, is unknown.")
+    return _PROTEUS_INTERFACES[task]
+
+
+# Context of each window, for the studies that define one.
+_CONTEXTS = {"dreyer2026proteus": _proteus_interface}
+
+
+def _proteus_run(trigger):
+    """Acquisition rank of a PROTEUS window's run within its session.
+
+    PROTEUS numbers the runs of a session in recording order across its
+    tasks (``run-1`` ... ``run-6``), so the BIDS run number is that rank.
+    """
+    return int(trigger["run"])
+
+
+# Acquisition order of the recordings within a stream, for the studies
+# that define one.
+_ORDERS = {"dreyer2026proteus": _proteus_run}
 
 
 class Dataset(BaseDataset):
@@ -102,6 +145,8 @@ class Dataset(BaseDataset):
             subset=self.subset,
             # One-hot ``(K,)`` -> integer class label.
             target_transform=lambda y: y.argmax(-1),
+            context_of=_CONTEXTS.get(self.study),
+            order_of=_ORDERS.get(self.study),
         )
 
     def get_data(self):

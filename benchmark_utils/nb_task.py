@@ -17,7 +17,14 @@ Differences with running neuralbench itself:
   torch batches moved onto ``device``, see ``benchmark_utils.data``), so
   nothing downstream is tied to neuralset/neuralbench types;
 - ``subset="test"`` restricts the pipeline to the test split (see
-  :func:`build_test_only_filter`) so workers can stage evaluation data only.
+  :func:`build_test_only_filter`) so workers can stage evaluation data only;
+- the test loader keeps neuralbench's order and batch size (recordings in
+  order, each in time order; one window per batch for the stream tasks),
+  and each window's ``info`` tells its recording, its start in it, its
+  stream (``data.stream_by``) and, when the caller defines one, its context,
+  which streamed evaluation and its scores need (see
+  ``benchmark_utils.streaming``). With ``order_of``, the validation and test
+  loaders put each stream's recordings in acquisition order.
 
 Like the rest of the neuro stack, this module is import-heavy; import it
 only from ``datasets/`` modules (never from solvers).
@@ -211,18 +218,52 @@ class _NBWindows(torch.utils.data.Dataset):
     """Adapt a prepared neuralset ``SegmentDataset`` split to ``(X, y, info)``.
 
     ``seg_ds[i]`` yields a neuralset ``Batch`` whose ``data`` holds the
-    ``neuro`` signal, the ``target`` and the ``subject_id``; this wrapper
-    converts them to the competition contract (plain torch tensors).
+    ``neuro`` signal, the ``target``, the ``subject_id`` and, for a task
+    that sets ``data.stream_by``, the ``stream_id``; this wrapper converts
+    them to the competition contract (plain torch tensors). ``info`` gives
+    each window's ``subject_id``, ``record_id`` (its recording),
+    ``onset`` (its start in that recording, in seconds) and ``stream_id``
+    (the task's stream, else its recording), so the scores can group the
+    windows by stream. With ``context_of``, it also gives each window's
+    ``context_id``: ``context_of`` maps the fields of a window's trigger
+    event (``subject``, ``session``, ``task``, ``run``, ...) to its context
+    label. With ``order_of``, the windows come with each stream's recordings
+    in acquisition order (see :func:`_acquisition_order`); ``stream_by``
+    names the trigger fields that make up a stream (``data.stream_by``).
     """
 
-    def __init__(self, seg_ds, target_transform=None):
+    def __init__(self, seg_ds, target_transform=None, context_of=None,
+                 order_of=None, stream_by=None):
         self.seg_ds = seg_ds
         self.target_transform = target_transform
+        # Recording and start of every window, from the segments alone (no
+        # signal is read). Recordings and contexts are numbered in order of
+        # appearance.
+        records = {}
+        self.record_id = np.array(
+            [records.setdefault(seg.timeline, len(records))
+             for seg in seg_ds.segments], dtype=np.int64)
+        self.onset = np.array([seg.start for seg in seg_ds.segments],
+                              dtype=np.float64)
+        self.context_id = None
+        if context_of is not None:
+            contexts = {}
+            self.context_id = np.array(
+                [contexts.setdefault(context_of(seg.trigger.to_dict()),
+                                     len(contexts))
+                 for seg in seg_ds.segments], dtype=np.int64)
+        # Position i of this dataset reads the segment self.index[i].
+        self.index = np.arange(len(seg_ds.segments), dtype=np.int64)
+        if order_of is not None:
+            self.index = _acquisition_order(
+                [seg.trigger.to_dict() for seg in seg_ds.segments],
+                self.record_id, self.onset, stream_by, order_of)
 
     def __len__(self):
-        return len(self.seg_ds)
+        return len(self.index)
 
     def __getitem__(self, i):
+        i = int(self.index[i])
         data = self.seg_ds[i].data
         X = torch.as_tensor(to_numpy(data["neuro"]), dtype=torch.float32)
         if X.ndim == 3:                 # (1, C, T) -> (C, T)
@@ -234,9 +275,57 @@ class _NBWindows(torch.utils.data.Dataset):
             y = self.target_transform(y)
         y = y.to(torch.float32 if y.is_floating_point() else torch.long)
         subject = data.get("subject_id")
-        info = {"subject_id": int(np.asarray(to_numpy(subject)).reshape(-1)[0])
-                if subject is not None else -1}
+        stream = data.get("stream_id")
+        info = {
+            "subject_id": _first(subject) if subject is not None else -1,
+            "record_id": int(self.record_id[i]),
+            "onset": float(self.onset[i]),
+            "stream_id": (_first(stream) if stream is not None
+                          else int(self.record_id[i])),
+        }
+        if self.context_id is not None:
+            info["context_id"] = int(self.context_id[i])
         return X, y, info
+
+
+def _first(value):
+    """The single integer of an extracted ``(1,)``-shaped label."""
+    return int(np.asarray(to_numpy(value)).reshape(-1)[0])
+
+
+def _acquisition_order(triggers, record_id, onset, stream_by, order_of):
+    """Window order putting each stream's recordings in acquisition order.
+
+    Parameters
+    ----------
+    triggers : list of dict
+        The fields of each window's trigger event.
+    record_id, onset : arrays, shape ``(N,)``
+        Each window's recording and its start in that recording.
+    stream_by : list of str or None
+        Trigger fields whose values make up a window's stream
+        (``data.stream_by``); None makes each recording its own stream.
+    order_of : callable
+        Maps a window's trigger fields to the acquisition rank of its
+        recording within its stream (e.g. the BIDS run number).
+
+    Returns
+    -------
+    index : array, shape ``(N,)``
+        The windows' indices in the new order: streams in order of first
+        appearance, each stream's recordings by ``order_of`` (ties in order
+        of first appearance), each recording's windows by start.
+    """
+    streams, first_window = {}, {}
+    keys = []
+    for i, trigger in enumerate(triggers):
+        stream = (tuple(str(trigger[field]) for field in stream_by)
+                  if stream_by else (int(record_id[i]),))
+        keys.append((streams.setdefault(stream, len(streams)),
+                     order_of(trigger),
+                     first_window.setdefault(int(record_id[i]), i),
+                     float(onset[i]), i))
+    return np.array([key[-1] for key in sorted(keys)], dtype=np.int64)
 
 
 def _window_sfreq(frequency, n_times, duration):
@@ -257,12 +346,17 @@ def _window_sfreq(frequency, n_times, duration):
     return n_times / float(duration)
 
 
-def _make_loaders(loaders, device, target_transform):
+def _make_loaders(loaders, device, target_transform, context_of=None,
+                  order_of=None, stream_by=None):
     """Rebuild the competition loaders from the neuralbench ones.
 
-    Keeps neuralbench's per-split datasets and train sampler (e.g. the
-    ``RegressionBinSampler``) but swaps the collate for the competition one
-    (plain tensors moved onto ``device``).
+    Keeps neuralbench's per-split datasets, batch sizes and train sampler
+    (e.g. the ``RegressionBinSampler``) but swaps the collate for the
+    competition one (plain tensors moved onto ``device``). Validation and
+    test windows stay in neuralbench's order, which streamed evaluation
+    relies on: never shuffle them. With ``order_of``, their streams'
+    recordings are put in acquisition order (the train split keeps its
+    order, which its sampler's indices refer to).
     """
     from torch.utils.data import DataLoader, default_collate
 
@@ -272,7 +366,9 @@ def _make_loaders(loaders, device, target_transform):
 
     out = {}
     for split, loader in loaders.items():
-        ds = _NBWindows(loader.dataset, target_transform)
+        ds = _NBWindows(loader.dataset, target_transform, context_of,
+                        order_of=None if split == "train" else order_of,
+                        stream_by=stream_by)
         out[split] = DataLoader(
             ds, batch_size=loader.batch_size, collate_fn=collate,
             sampler=getattr(loader, "sampler", None)
@@ -285,7 +381,8 @@ def _make_loaders(loaders, device, target_transform):
 
 def load_task(modality, task, *, data_dir, dataset=None, device="cpu",
               batch_size=64, seed=0, num_workers=0, overrides=None,
-              target_transform=None, subset="full"):
+              target_transform=None, context_of=None, order_of=None,
+              subset="full"):
     """Build the competition loaders + meta from a neuralbench task config.
 
     Parameters
@@ -309,6 +406,14 @@ def load_task(modality, task, *, data_dir, dataset=None, device="cpu",
         the loader settings above.
     target_transform : callable or None
         Applied to each window's target (e.g. one-hot -> class index).
+    context_of : callable or None
+        Maps the fields of a window's trigger event (a dict) to its context
+        label, given as ``info["context_id"]`` (see :class:`_NBWindows`).
+    order_of : callable or None
+        Maps the fields of a window's trigger event to the acquisition rank
+        of its recording within its stream: the validation and test loaders
+        then give each stream's recordings in that order (see
+        :func:`_acquisition_order`).
     subset : {"full", "test"}
         ``"test"`` restricts the study to its test split via a
         ``filter_stimuli`` override (:func:`build_test_only_filter`) —
@@ -344,7 +449,8 @@ def load_task(modality, task, *, data_dir, dataset=None, device="cpu",
         raise ValueError(f"subset must be 'full' or 'test', got {subset!r}")
 
     nb_loaders = Data(**cfg).prepare()
-    loaders = _make_loaders(nb_loaders, device, target_transform)
+    loaders = _make_loaders(nb_loaders, device, target_transform, context_of,
+                            order_of, cfg.get("stream_by"))
 
     # Peek one window (lazy) for shapes; channel names come from the prepared
     # neuro extractor's channel map.
