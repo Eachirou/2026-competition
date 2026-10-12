@@ -14,7 +14,7 @@ Packaging and upload instructions are in **Get Started → Submission Guide**.
 |---|---|---|
 | **Evaluation data** | Public EMG2Pose `user_stage` test split | Private 2026 Meta Reality Labs cohort |
 | **Generalization** | Unseen user-stage combinations | New users, stages, and user-stage combinations |
-| **Delivery** | Independent windows in ordinary evaluation batches | One chronological window at a time within each recording |
+| **Delivery** | Independent windows in ordinary evaluation batches | The same batched model-facing contract |
 | **Ranking metric** | Mean absolute angular error reported in degrees | The same prediction and metric contract |
 
 Warm-up scores are indicative only because the datasets and generalization
@@ -57,30 +57,27 @@ Declare every external corpus in the final method description for the
 reproducibility audit. Private sealed data and non-permitted closed datasets
 may not be used.
 
-## Sequential inference and adaptation
+## Batching and adaptation
 
-### How are sealed windows delivered, and what does “no future” mean?
+### How are windows delivered? Is their order meaningful?
 
-In the sealed phase there is no shuffling within a recording: windows are
-presented in strict chronological order, one at a time (`B = 1`). A model may
-use earlier windows from the current recording, but not later windows. The
-complete current five-second window is available when `predict` is called, so
-bidirectional processing **within that window** is permitted. The order of
-independent recordings, recording identifiers, and cross-recording continuity
-are not model-facing signals, so a submission must not depend on state carrying
-between recordings.
-
-This differs from the current warm-up runner, whose batch order and composition
-must not be assumed and whose public
+Warm-up and sealed evaluation both present independent five-second windows in
+ordinary batches. The complete current window is available, so bidirectional
+processing within it is permitted. Batch size, composition, and order are not
+part of the model-facing contract. A batch may mix windows or recordings, and
+recording identifiers and temporal continuity are not supplied to the model.
+Submissions therefore must not infer chronology from row order or depend on
+state carrying across `predict` calls. The public
 [`objective.py`](https://github.com/neural-interfaces26/2026-competition/blob/main/tracks/emg_pose/objective.py)
-evaluates ordinary independent batches from the public EMG2Pose adapter.
+implements this batched contract.
 
 ### Is unsupervised test-time adaptation allowed?
 
-Yes. A model may update causal statistics or parameters—including gradient
-updates inside `predict`—using only the current window and earlier windows in
-the current sequential stream. It may not use labels or future windows, and it
-must stay within the worker time and memory limits.
+Yes. A model may compute label-free statistics or update parameters, including
+with gradients, from the current batch inside `predict`. It may not use labels
+or assume that adjacent rows or successive calls belong to the same recording.
+The method must accept varying batch sizes and remain within the worker time
+and memory limits.
 
 ## Prediction and scoring
 

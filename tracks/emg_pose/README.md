@@ -12,11 +12,11 @@ EMG.
   converts only the final aggregate score to degrees for the leaderboard.
   Reported alongside, as NeuralBench logs them: the mean and standard
   deviation of the per-subject MAE, the RMSE and the R2.
-- **Evaluation:** the current public warm-up objective treats five-second
-  windows as independent dense-prediction examples in ordinary batches. The
-  sealed phase instead presents one window at a time, chronologically within
-  each recording; past windows and the complete current window may be used,
-  but future windows may not. See the Codabench
+- **Evaluation:** warm-up and sealed evaluation both treat five-second
+  windows as independent dense-prediction examples in ordinary batches.
+  Batch size, composition, and order are not part of the contract. A model
+  may use the complete current window, but must not rely on temporal
+  continuity or persistent state across `predict` calls. See the Codabench
   [Scientific FAQ](../../codabench/pages/scientific_faq_emg.md).
 - **Benchopt objective:** `EMG-pose`.
 

@@ -37,7 +37,7 @@ Given a window of **16-channel wrist surface EMG**, predict continuous trajector
 | **Input**                | One temporal window of 16-channel wrist sEMG                       |
 | **Prediction**           | Continuous trajectories for 20 UmeTrack joint angles in radians    |
 | **Objective**            | Reconstruct hand pose throughout the input window                  |
-| **Delivery**             | One five-second window at a time, chronologically within recording |
+| **Delivery**             | Independent five-second windows in ordinary evaluation batches     |
 | **Generalization shift** | New users, new movement stages, and unseen user-stage combinations |
 | **Sealed split**         | Evaluation examples and labels remain hidden                       |
 
@@ -55,7 +55,7 @@ Codabench computes the absolute angular difference in radians between every pred
 
 EMG2Pose also underlies the **[reported NeuroPose baseline scores](https://neural-interfaces26.github.io/participant-guide.html#baseline-track-4)**. Because the data and labels are public, leakage is possible and warm-up scores are indicative only. Only the sealed phase determines the final ranking.
 
-**Sealed evaluation.** Codabench switches to the private 2026 Meta Reality Labs cohort described in the **[main website’s dataset directory](https://neural-interfaces26.github.io/tracks.html#dataset-track-4)**. It includes movement stages outside the 29 public EMG2Pose stages. Windows are delivered chronologically within each recording, one at a time: submissions may use earlier windows and the complete current five-second window, but not future windows. Label-free causal adaptation, including gradient updates inside `predict`, is allowed. The cohort is uploaded only for the sealed phase, and its evaluation examples and labels remain hidden.
+**Sealed evaluation.** Codabench switches to the private 2026 Meta Reality Labs cohort described in the **[main website’s dataset directory](https://neural-interfaces26.github.io/tracks.html#dataset-track-4)**. It includes movement stages outside the 29 public EMG2Pose stages. As in warm-up, five-second windows are evaluated as independent examples in ordinary batches. Batch size, composition, and order are not part of the contract, so submissions must not rely on temporal continuity or persistent state across `predict` calls. Label-free adaptation inside the current batch, including gradient updates, is allowed within the worker time and memory limits. The cohort is uploaded only for the sealed phase, and its evaluation examples and labels remain hidden.
 
 ## Track resources and next steps
 
