@@ -5,7 +5,8 @@ short EEG window, capped at 600 s. A submission's model receives torch
 batches ``(B, C, T)`` and must return one predicted latency per window
 (``predict(X) -> (B,)`` floats, in seconds).
 
-Evaluation is causal and streamed (``benchmark_utils/streaming.py``): each
+Model-facing evaluation is causal and streamed
+(``benchmark_utils/streaming.py``): each
 recording is predicted one window at a time (``B = 1``), forward in time,
 and every recording starts from a fresh copy of the model whose optional
 ``reset_state()`` is called first.

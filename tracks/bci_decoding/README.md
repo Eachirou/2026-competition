@@ -8,7 +8,8 @@ and days.
 - **Input:** torch tensor `(B, C, T)` on `meta["device"]`.
 - **Output:** `predict(X) -> (B,)`, one integer class index per window, with
   `meta["n_classes"]` possible classes.
-- **Evaluation:** causal and streamed. Windows reach `predict` one at a time
+- **Evaluation:** model-facing inference is causal and streamed. Windows reach
+  `predict` one at a time
   (`B = 1`), each session of each participant in recording order, and every
   session starts from a `copy.deepcopy` of your model whose optional
   `reset_state()` is called first: a model can adapt within a session but

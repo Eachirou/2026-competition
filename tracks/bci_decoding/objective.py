@@ -4,7 +4,8 @@ Cued mental-command classification from short EEG windows — *epoched*: one
 label per window. A submission's model receives torch batches ``(B, C, T)``
 and must return one predicted class per window (``predict(X) -> (B,)``).
 
-Evaluation is causal and streamed (``benchmark_utils/streaming.py``): the
+Model-facing evaluation is causal and streamed
+(``benchmark_utils/streaming.py``): the
 windows of each session of each participant reach the model one at a time
 (``B = 1``), its runs in recording order, and every session starts from a
 fresh copy of the model whose optional ``reset_state()`` is called first.

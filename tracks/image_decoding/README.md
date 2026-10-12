@@ -8,8 +8,13 @@ embedding from a candidate image pool.
 - **Input:** torch tensor `(B, C, T)` on `meta["device"]`.
 - **Output:** `predict(X) -> (B, D)` float image embeddings, where
   `D = meta["n_outputs"]`.
-- **Metric implemented here:** top-5 cosine-similarity retrieval accuracy,
-  with top-1 reported alongside.
+- **Metrics implemented here:** pooled top-5 cosine-similarity retrieval for
+  warm-up, and top-5 after averaging repeated predictions within each subject
+  and image for sealed evaluation. Top-1 variants are reported alongside; the
+  active Codabench phase selects its ranking key.
+- **Evaluation:** epochs are independent. Batch order, composition and size
+  are not part of the contract; do not carry model state across `predict`
+  calls.
 - **Benchopt objective:** `Image-decoding`.
 
 See the Codabench **Track description** for the active phase data and official

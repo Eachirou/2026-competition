@@ -8,7 +8,8 @@ short EEG window.
 - **Input:** torch tensor `(B, C, T)` on `meta["device"]`.
 - **Output:** `predict(X) -> (B,)` float latencies in seconds, capped at 600,
   with `meta["n_outputs"] = 1`.
-- **Evaluation:** causal and streamed. Each recording reaches `predict` one
+- **Evaluation:** model-facing inference is causal and streamed. Each recording
+  reaches `predict` one
   window at a time (`B = 1`), forward in time, and starts from a
   `copy.deepcopy` of your model whose optional `reset_state()` is called
   first: a model can adapt within a recording but carries nothing over to the
