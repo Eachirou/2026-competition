@@ -51,9 +51,9 @@ class Dataset(BaseDataset):
         # (``Interaxon2026Muse[num_workers=4]``) on a worker with spare
         # cores.
         "num_workers": [0],
-        # "test" restricts the study to its test split (worker staging /
-        # evaluation-only runs; incompatible with the objective's
-        # training=True) — see benchmark_utils.nb_task.
+        # "test" would restrict the study to its test split, which only a
+        # PredefinedSplit supports (see benchmark_utils.nb_task): this task
+        # builds its split at runtime, so the warm-up stages "full".
         "subset": ["full"],
     }
 
@@ -81,6 +81,9 @@ class Dataset(BaseDataset):
             seed=self.get_seed(),
             num_workers=self.num_workers,
             subset=self.subset,
+            # One latency per window, ``(1,)`` -> scalar: batches are
+            # ``(B,)``, the regression target contract (benchmark_utils.data).
+            target_transform=lambda y: y.reshape(()),
         )
 
     def get_data(self):

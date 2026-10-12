@@ -61,9 +61,9 @@ class Dataset(BaseDataset):
         # shared CI/platform runners want. Raise it from the phase config
         # (``BCI[num_workers=4]``) on a worker with spare cores.
         "num_workers": [0],
-        # "test" restricts the study to its test split (worker staging /
-        # evaluation-only runs; incompatible with the objective's
-        # training=True) — see benchmark_utils.nb_task.
+        # "test" would restrict the study to its test split, which only a
+        # PredefinedSplit supports (see benchmark_utils.nb_task): the stream
+        # task draws its split at runtime, so the warm-up stages "full".
         "subset": ["full"],
     }
 
