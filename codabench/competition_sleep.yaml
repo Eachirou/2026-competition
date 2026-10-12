@@ -28,6 +28,8 @@ terms: pages/terms.md
 pages:
   - title: Track description
     file: pages/competition_sleep.md
+  - title: Scientific FAQ
+    file: pages/scientific_faq_sleep.md
   - title: Registration Guide
     file: pages/registration.md
   - title: Submission Guide
