@@ -46,7 +46,11 @@ class Dataset(BaseDataset):
     name = "Image"
 
     requirements = [
-        "pip::neuralset", "pip::neuralfetch", "pip::neuralbench",
+        # neuroai release, pinned like requirements.txt.
+        "pip::neuralset==0.4.0",
+        "pip::neuralfetch==0.4.0",
+        "pip::neuraltrain==0.4.0",
+        "pip::neuralbench==0.4.0",
         "pip::mne", "pip::transformers", "scikit-learn",
     ]
 

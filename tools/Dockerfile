@@ -24,8 +24,6 @@
 # container runtime without a CUDA base image.
 FROM python:3.12-slim
 
-ENV DEBIAN_FRONTEND=noninteractive
-
 # The torch trio from the official PyTorch wheel index with an explicit CUDA
 # channel: cu130 includes kernels for the G7 Blackwell GPUs (sm_120) and
 # requires a compatible NVIDIA 580+ host driver. All three come from the same

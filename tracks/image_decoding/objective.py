@@ -7,7 +7,10 @@ embedding space, e.g. DINOv2). Each test window's prediction is ranked
 against the candidate pool (the unique target embeddings of the test split)
 by cosine similarity.
 
-Ranking metric: **top-5 accuracy** (top-1 reported alongside).
+Ranking metric: **top-5 accuracy** (top-1 reported alongside), pooled over all
+test windows. The ``*_subject_agg`` variants average the predictions of the
+repeated presentations of each image *within a subject* before retrieval, then
+pool those (subject, image) queries (neuralbench's ``top-k_subject-agg``).
 Data flows as lazy dataloaders — see ``benchmark_utils/data.py``; targets ``y``
 are the float embeddings ``(B, D)`` of the viewed images.
 """
@@ -15,8 +18,8 @@ are the float embeddings ``(B, D)`` of the viewed images.
 import numpy as np
 from benchopt import BaseObjective
 
-from benchmark_utils.data import to_numpy
-from benchmark_utils.metrics import topk_accuracy
+from benchmark_utils.data import subject_ids, to_numpy
+from benchmark_utils.metrics import group_means, topk_accuracy
 
 
 def _normalize(v):
@@ -73,23 +76,38 @@ class Objective(BaseObjective):
         )
 
     def evaluate_result(self, model):
-        y_true, y_pred = [], []
-        for X, y, _info in self.test_loader:
-            y_pred.append(to_numpy(model.predict(X)))
+        y_true, y_pred, subject = [], [], []
+        for X, y, info in self.test_loader:
+            pred = to_numpy(model.predict(X))
+            y_pred.append(pred)
             y_true.append(to_numpy(y))
+            subject.append(subject_ids(info, len(pred)))
         y_true = np.concatenate(y_true)          # (N, D)
         y_pred = np.concatenate(y_pred)          # (N, D)
+        subject = np.concatenate(subject)        # (N,)
 
-        # Candidate pool: the unique target embeddings of the test split
+        # Candidate gallery: the unique target embeddings of the test split
         # (repeated presentations of one image share its embedding).
         candidates, target_idx = np.unique(
             y_true, axis=0, return_inverse=True
         )
         scores = _normalize(y_pred) @ _normalize(candidates).T  # (N, M)
 
+        # Subject-aggregated retrieval (neuralbench top-k_subject-agg): average
+        # the predictions of the repeated presentations of each image *within a
+        # subject*, then pool those (subject, image) queries and rank them
+        # against the gallery.
+        keys, pred_sa = group_means(
+            y_pred, np.stack([subject, target_idx.reshape(-1)], axis=1)
+        )
+        sa_idx = keys[:, 1]  # gallery (image) index of each query
+        scores_sa = _normalize(pred_sa) @ _normalize(candidates).T
+
         return dict(
             top5_acc=topk_accuracy(scores, target_idx, k=5),
             top1_acc=topk_accuracy(scores, target_idx, k=1),
+            top5_acc_subject_agg=topk_accuracy(scores_sa, sa_idx, k=5),
+            top1_acc_subject_agg=topk_accuracy(scores_sa, sa_idx, k=1),
             n_candidates=int(len(candidates)),
         )
 
