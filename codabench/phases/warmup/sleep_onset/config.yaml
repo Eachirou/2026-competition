@@ -14,5 +14,6 @@ seed: 42
 no_timeout: true
 scoring:
   columns:
+    wbmae_recording_mean: objective_wbmae_recording_mean
     bmae: objective_bmae
     mae: objective_mae
