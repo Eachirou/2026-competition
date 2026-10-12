@@ -336,8 +336,13 @@ def load_task(modality, task, *, data_dir, dataset=None, device="cpu",
         raw_y0 = raw_y0[0]
     ch_names = _channel_names(nb_loaders["test"].dataset)
     neuro = nb_loaders["test"].dataset.extractors["neuro"]
+    sfreq = neuro.frequency
+    if sfreq == "native":
+        # The signal keeps its recorded rate (e.g. Track 3's Muse data):
+        # read it off a window, its samples over its duration.
+        sfreq = X0.shape[-1] / float(cfg["duration"])
     meta = dict(
-        sfreq=float(neuro.frequency),
+        sfreq=float(sfreq),
         ch_names=ch_names,
         chs_info=chs_info_from_names(ch_names),
         n_chans=int(X0.shape[-2]),
