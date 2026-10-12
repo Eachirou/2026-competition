@@ -346,8 +346,35 @@ def _window_sfreq(frequency, n_times, duration):
     return n_times / float(duration)
 
 
+class _DeviceLoader:
+    """Move batches to ``device`` in the main process.
+
+    PyTorch executes ``collate_fn`` inside worker processes when
+    ``num_workers > 0``. Moving tensors to CUDA there is unsupported, so the
+    underlying loader always collates CPU tensors and this thin wrapper moves
+    them after they return to the main process. Attribute access delegates to
+    the wrapped loader so Benchopt solvers still see ``dataset``,
+    ``batch_size`` and the other standard DataLoader attributes.
+    """
+
+    def __init__(self, loader, device):
+        self.loader = loader
+        self.device = device
+
+    def __iter__(self):
+        for X, y, info in self.loader:
+            yield X.to(self.device, non_blocking=True), y.to(
+                self.device, non_blocking=True), info
+
+    def __len__(self):
+        return len(self.loader)
+
+    def __getattr__(self, name):
+        return getattr(self.loader, name)
+
+
 def _make_loaders(loaders, device, target_transform, context_of=None,
-                  order_of=None, stream_by=None):
+                  order_of=None, stream_by=None, num_workers=0):
     """Rebuild the competition loaders from the neuralbench ones.
 
     Keeps neuralbench's per-split datasets, batch sizes and train sampler
@@ -358,24 +385,24 @@ def _make_loaders(loaders, device, target_transform, context_of=None,
     recordings are put in acquisition order (the train split keeps its
     order, which its sampler's indices refer to).
     """
-    from torch.utils.data import DataLoader, default_collate
-
-    def collate(batch):
-        X, y, info = default_collate(batch)
-        return X.to(device), y.to(device), info
+    from torch.utils.data import DataLoader
 
     out = {}
     for split, loader in loaders.items():
         ds = _NBWindows(loader.dataset, target_transform, context_of,
                         order_of=None if split == "train" else order_of,
                         stream_by=stream_by)
-        out[split] = DataLoader(
-            ds, batch_size=loader.batch_size, collate_fn=collate,
+        cpu_loader = DataLoader(
+            ds, batch_size=loader.batch_size,
             sampler=getattr(loader, "sampler", None)
             if split == "train" else None,
             shuffle=(split == "train"
                      and getattr(loader, "sampler", None) is None),
+            num_workers=num_workers,
+            pin_memory=str(device).startswith("cuda"),
+            persistent_workers=num_workers > 0,
         )
+        out[split] = _DeviceLoader(cpu_loader, device)
     return out
 
 
@@ -449,8 +476,10 @@ def load_task(modality, task, *, data_dir, dataset=None, device="cpu",
         raise ValueError(f"subset must be 'full' or 'test', got {subset!r}")
 
     nb_loaders = Data(**cfg).prepare()
-    loaders = _make_loaders(nb_loaders, device, target_transform, context_of,
-                            order_of, cfg.get("stream_by"))
+    loaders = _make_loaders(
+        nb_loaders, device, target_transform, context_of, order_of,
+        cfg.get("stream_by"), num_workers=num_workers,
+    )
 
     # Peek one window (lazy) for shapes; channel names come from the prepared
     # neuro extractor's channel map.

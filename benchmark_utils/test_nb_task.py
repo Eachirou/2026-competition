@@ -188,3 +188,15 @@ def test_evaluation_loaders_follow_acquisition_order():
 def test_windows_keep_neuralbench_order_without_order_of():
     segments = [_Segment("b", 0.0, run="2"), _Segment("a", 0.0, run="1")]
     assert _NBWindows(_SegmentDataset(segments)).index.tolist() == [0, 1]
+
+
+def test_rebuilt_loader_keeps_requested_worker_count():
+    segments = [_Segment("a", 0.0)]
+    loaders = _make_loaders(
+        {"test": _Loader(_SegmentDataset(segments))}, "cpu", None,
+        num_workers=2,
+    )
+    assert loaders["test"].num_workers == 2
+    X, y, info = next(iter(loaders["test"]))
+    assert X.device.type == y.device.type == "cpu"
+    assert info["record_id"].tolist() == [0]
