@@ -10,8 +10,8 @@ registration_auto_approve: False
 contact_email: neurips2026-eeg-emg-competition@googlegroups.com
 
 # The image submissions run in; it must carry the requirements.txt stack.
-# NB: tools/Dockerfile (pytorch 2.8 base) is not the source of this image.
-docker_image: tommoral/neural-compet:v2
+# Built from tools/Dockerfile with tools/build_image.sh.
+docker_image: lionelyneuro/neural-compet:v3
 
 # Only the leaderboard metrics are exposed: no detailed_results.html is
 # produced by the scoring program, and the forum is unused (support goes
