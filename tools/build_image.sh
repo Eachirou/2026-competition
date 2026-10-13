@@ -8,11 +8,11 @@
 #
 # One image serves the 4 tracks and both phases: the benchmark and the phase
 # config travel in the phase bundle, not in the image.
-set -euo pipefail
+set -exuo pipefail
 
 cd "$(dirname "$0")/.."
 REGISTRY=${REGISTRY:-lionelyneuro}
-TAG=v2 PUSH=0
+TAG=v3 PUSH=0
 while [[ $# -gt 0 ]]; do
     case $1 in
         -t|--tag) TAG=$2; shift 2 ;;
@@ -23,5 +23,5 @@ done
 
 image="$REGISTRY/neural-compet:$TAG"
 echo "=== $image ==="
-docker build --platform linux/amd64 -f tools/Dockerfile -t "$image"
+docker build --platform linux/amd64 -f tools/Dockerfile -t "$image" .
 [[ $PUSH == 1 ]] && docker push "$image"
