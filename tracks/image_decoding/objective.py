@@ -7,10 +7,12 @@ embedding space, e.g. DINOv2). Each test window's prediction is ranked
 against the candidate pool (the unique target embeddings of the test split)
 by cosine similarity.
 
-Ranking metric: **top-5 accuracy** (top-1 reported alongside), pooled over all
-test windows. The ``*_subject_agg`` variants average the predictions of the
-repeated presentations of each image *within a subject* before retrieval, then
-pool those (subject, image) queries (neuralbench's ``top-k_subject-agg``).
+The objective exposes two phase-specific Top-5 metrics (with Top-1 reported
+alongside): warm-up uses retrieval pooled over all test windows, while sealed
+evaluation uses the ``*_subject_agg`` variant, which averages predictions of
+repeated presentations of each image *within a subject* before retrieval and
+then pools the resulting (subject, image) queries (NeuralBench's
+``top-k_subject-agg``). The active Codabench phase selects the ranking key.
 Data flows as lazy dataloaders — see ``benchmark_utils/data.py``; targets ``y``
 are the float embeddings ``(B, D)`` of the viewed images.
 """

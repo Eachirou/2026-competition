@@ -20,9 +20,11 @@
 
 > **Sealed-phase specification.** The description, task contract, and ranking metric below define the final Muse phase. Warm-up uses the public Muse data and scores W-bMAE per recording, without the sealed phase's seen/unseen split. Phase-specific differences are detailed below.
 
+For focused answers about the public release, first-N2 target, preprocessing, stream boundaries, model state, inference metadata, and scoring, read the **[Track 03 Scientific FAQ](https://github.com/neural-interfaces26/2026-competition/blob/main/codabench/pages/scientific_faq_sleep.md)**.
+
 _Estimate how long remains before the first N2 sleep epoch from wearable EEG recorded at home._
 
-Given a short window from a continuous **four-channel, 128 Hz home EEG** recording, predict the number of seconds remaining until the first N2 epoch, capped at 600 seconds. Evaluation includes both new recordings from participants represented in training and recordings from completely unseen participants, testing robustness to both night-to-night and inter-person variability, as well as motion artifacts, impedance changes, and occasional channel dropout.
+Given a continuous **four-channel, 128 Hz home EEG** recording, predict from each five-second window the number of seconds remaining until the first N2 epoch, capped at 600 seconds. Windows arrive one at a time in chronological order. Models may use past context within the current recording, but never future windows, and their state is reset between recordings. Evaluation includes both new recordings from participants represented in training and recordings from completely unseen participants.
 
 <p align="center">
   <img src="https://neural-interfaces26.github.io/exports/sleep-onset.gif?v=20260921muse" alt="Continuous wearable EEG used to predict the time remaining until the first N2 epoch" width="640" style="display:block;max-width:100%;height:auto;margin:1.25rem auto;">
@@ -32,9 +34,9 @@ Given a short window from a continuous **four-channel, 128 Hz home EEG** recordi
 
 |                          |                                                                           |
 | ------------------------ | ------------------------------------------------------------------------- |
-| **Input**                | One window from a continuous four-channel, 128 Hz home EEG recording      |
-| **Prediction**           | One latency in seconds until the first N2 epoch, capped at 600 seconds    |
-| **Objective**            | Estimate the transition from wakefulness to N2 sleep                      |
+| **Input**                | Chronological five-second windows from four-channel Muse EEG at 128 Hz    |
+| **Prediction**           | One latency in seconds until the first N2 epoch per window, capped at 600 seconds |
+| **Objective**            | Estimate approaching first N2 from the current and earlier windows only   |
 | **Generalization shift** | New nights from seen participants and recordings from unseen participants |
 | **Sealed split**         | Separate seen-subject and unseen-subject evaluation groups                |
 
@@ -54,7 +56,9 @@ W-bMAE is reported separately for **seen subjects** (new recordings from people 
 
 The Muse data is the default dataset of the **[Track 03 NeuralBench start kit](https://facebookresearch.github.io/neuroai/neuralbench/auto_examples/biosignal_challenge_2026/plot_track3_sleep_onset.html)**, whose `test/wbmae_stream_mean` is the warm-up score. The **[reported public baseline scores](https://neural-interfaces26.github.io/participant-guide.html#baseline-track-3)** use **Sleep-EDF**. Because the test data and labels are public, training overlap, overfitting, or leakage is possible. Warm-up scores are indicative only and support submission validation and iteration. Only the sealed phase determines the final ranking.
 
-**Sealed evaluation.** Codabench uses the private 2026 Muse cohort described in the **[main website’s dataset directory](https://neural-interfaces26.github.io/tracks.html#dataset-track-3)**. It combines new recordings from participants represented in training with recordings from completely unseen participants. Evaluation recordings and labels remain hidden.
+**Legacy warm-up.** Codabench previously used two-channel Sleep-EDF with batched windows and unweighted bMAE. The current Muse warm-up uses four channels at native 128 Hz, chronological one-window-per-recording streaming, and per-recording W-bMAE, so prior submissions must be adapted and scores are not comparable.
+
+**Sealed evaluation.** Codabench uses the private 2026 Muse cohort described in the **[main website’s dataset directory](https://neural-interfaces26.github.io/tracks.html#dataset-track-3)**. It combines new recordings from participants represented in training with recordings from completely unseen participants. Recordings, labels, group membership, and exact cohort composition remain hidden.
 
 ## Track resources and next steps
 

@@ -20,9 +20,11 @@
 
 > **Sealed-phase specification.** The description, task contract, and ranking metric below define the final three-command phase. Warm-up uses the public PROTEUS training release instead. Phase-specific differences are detailed below.
 
+For focused answers about the public release, split, preprocessing, stream boundaries, adaptation, inference metadata, and scoring aggregation, read the **[Track 02 Scientific FAQ](https://github.com/neural-interfaces26/2026-competition/blob/main/codabench/pages/scientific_faq_bci.md)**.
+
 _Decode a user’s intended mental command reliably across recording sessions._
 
-Given a short 47-channel recording window, predict one of three cued commands: **kinesthetic motor imagery, mental calculation, or word association**. The channels comprise 43 EEG, 2 EMG, and 2 EOG signals sampled at 500 Hz. Models receive labeled calibration sessions from each evaluation participant, then predict later sessions from those same participants. This longitudinal split isolates within-user, cross-session drift without additional calibration.
+Given a short 41-channel EEG window, predict one of three cued commands: **kinesthetic motor imagery, mental subtraction, or word generation**. Source recordings are sampled at 500 Hz and transformed by the published competition pipeline into 4-second, 120 Hz windows in microvolts. Sealed evaluation combines later sessions from represented participants with recordings from participants absent from the public release, testing both session drift and inter-person transfer.
 
 <p align="center">
   <img src="https://neural-interfaces26.github.io/exports/bci-decoding.gif" alt="Three cued mental commands decoded from EEG across recording sessions" width="640" style="display:block;max-width:100%;height:auto;margin:1.25rem auto;">
@@ -32,11 +34,11 @@ Given a short 47-channel recording window, predict one of three cued commands: *
 
 |                          |                                                                                      |
 | ------------------------ | ------------------------------------------------------------------------------------ |
-| **Input**                | Short windows from 43 EEG, 2 EMG, and 2 EOG channels at 500 Hz                       |
-| **Prediction**           | One class index for motor imagery, mental calculation, or word association           |
-| **Objective**            | Maintain command decoding across recording sessions                                  |
-| **Generalization shift** | Later sessions from the same users                                                   |
-| **Sealed split**         | Labeled early sessions provide calibration, while later-session labels remain hidden |
+| **Input**                | Four-second windows from 41 EEG channels, resampled to 120 Hz                         |
+| **Prediction**           | One class index for motor imagery, mental subtraction, or word generation             |
+| **Objective**            | Maintain command decoding across sessions and participants                            |
+| **Generalization shift** | Later sessions from represented participants and entirely new participants            |
+| **Sealed split**         | Public early sessions support development; all sealed labels remain hidden            |
 
 ## Sealed-phase ranking metric
 
@@ -50,9 +52,11 @@ Within each subject, session, and context cell, balanced accuracy is the unweigh
 
 **Warm-up evaluation.** Warm-up submissions on Codabench are evaluated on the public **PROTEUS** training release ([NEMAR nm000290](https://doi.org/10.82901/nemar.nm000290)), the Graz and BrainHero data of this track. The evaluation participants are the test participants of the [Track 02 NeuralBench start kit](https://facebookresearch.github.io/neuroai/neuralbench/auto_examples/biosignal_challenge_2026/plot_track2_eeg_to_bci.html) split, which assigns participants to training, validation and test (60/20/20, random state 33). Its windows hold the release's 41 EEG channels, filtered and resampled to 120 Hz, in microvolts. Codabench streams each session of each participant one window at a time, in recording order, and ranks by balanced accuracy over the three commands within each subject, session and context cell, averaged over cells; the context of a run is its interface, Graz or BrainHero. Balanced accuracy pooled over all evaluation windows and plain accuracy are reported separately.
 
-The **[Track 02 NeuralBench competition guide](https://facebookresearch.github.io/neuroai/neuralbench/auto_examples/biosignal_challenge_2026/plot_track2_eeg_to_bci.html)** runs this configuration by default (`neuralbench eeg _motor_imagery_stream`). Its `test/bal_acc_stream_mean` averages balanced accuracy over sessions without separating the two interfaces, so it can differ from the warm-up score. The **[reported public baseline scores](https://neural-interfaces26.github.io/participant-guide.html#baseline-track-2)** use **Stieger 2021**. Because the warm-up test data and labels are public, training overlap, overfitting, or leakage is possible. Warm-up scores are indicative only and support submission validation and iteration. Only the sealed phase determines the final ranking.
+The **[Track 02 NeuralBench competition guide](https://facebookresearch.github.io/neuroai/neuralbench/auto_examples/biosignal_challenge_2026/plot_track2_eeg_to_bci.html)** runs this configuration by default (`neuralbench eeg _motor_imagery_stream`). Its `test/bal_acc_stream_mean` averages balanced accuracy over sessions without separating the two interfaces, so it can differ from the warm-up score. The **[reported public baseline scores](https://neural-interfaces26.github.io/participant-guide.html#baseline-track-2)** use the public **PROTEUS** cross-subject split. Because the warm-up test data and labels are public, training overlap, overfitting, or leakage is possible. Warm-up scores are indicative only and support submission validation and iteration. Only the sealed phase determines the final ranking.
 
-**Sealed evaluation.** Codabench uses the private later-session split of the 2026 Graz and BrainHero dataset described in the **[main website’s dataset directory](https://neural-interfaces26.github.io/tracks.html#dataset-track-2)**. It is uploaded for the sealed phase, and its later-session recordings and labels remain hidden.
+**Legacy warm-up.** Codabench previously used Dreyer 2023 for a batched two-class motor-imagery proxy with pooled balanced accuracy. The current PROTEUS warm-up instead uses 41 EEG channels, three commands, session-wise one-window streaming, and cell-averaged balanced accuracy, so prior submissions must be adapted and scores are not comparable.
+
+**Sealed evaluation.** Codabench uses private recordings from the same 20-participant, six-session acquisition programme described in the **[main website’s dataset directory](https://neural-interfaces26.github.io/tracks.html#dataset-track-2)**. Evaluation combines later sessions from represented participants with participants absent from the public release. Recordings and labels remain hidden.
 
 ## Track resources and next steps
 

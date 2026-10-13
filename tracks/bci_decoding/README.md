@@ -8,7 +8,8 @@ and days.
 - **Input:** torch tensor `(B, C, T)` on `meta["device"]`.
 - **Output:** `predict(X) -> (B,)`, one integer class index per window, with
   `meta["n_classes"]` possible classes.
-- **Evaluation:** causal and streamed. Windows reach `predict` one at a time
+- **Evaluation:** model-facing inference is causal and streamed. Windows reach
+  `predict` one at a time
   (`B = 1`), each session of each participant in recording order, and every
   session starts from a `copy.deepcopy` of your model whose optional
   `reset_state()` is called first: a model can adapt within a session but
@@ -52,14 +53,21 @@ neuralbench eeg _motor_imagery_stream --prepare
 neuralbench eeg _motor_imagery_stream -m eegnet --debug
 ```
 
-Reference development results on Stieger 2021 with NeuralBench's batch
-`motor_imagery` task, not Codabench warm-up scores:
+Reference development results on the public PROTEUS cross-subject split with
+NeuralBench 0.4.0. The metric is `test/bal_acc_stream_mean`, averaged over
+the streamed test sessions; Codabench additionally separates PROTEUS
+contexts when computing its official warm-up cell mean.
 
 | Baseline | Balanced accuracy |
 |---|---|
-| Chance | 24.81 ± 1.03 |
-| EEGNet | 58.58 ± 0.34 |
-| REVE frozen probe | 68.04 ± 0.73 |
+| Constant prediction | 33.3% |
+| EEGNet | 32.6% |
+| CTNet | 35.0% |
+| REVE fine-tuned | 36.0% |
+
+Values are means over seeds 33, 34 and 35. This public split is purely
+cross-subject and is harder than the mixed cross-session and cross-subject
+sealed protocol.
 
 [Open the Track 02 NeuralBench guide](https://facebookresearch.github.io/neuroai/neuralbench/auto_examples/biosignal_challenge_2026/plot_track2_eeg_to_bci.html).
 After training its EEGNet, use the shared

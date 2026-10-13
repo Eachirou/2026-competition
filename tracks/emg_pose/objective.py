@@ -14,6 +14,11 @@ averaged over joints. Data flows as lazy dataloaders — see
 ``benchmark_utils/data.py``; targets ``y`` are float ``(B, n_joints, T)``
 angle sequences.
 
+Warm-up and sealed evaluation both use ordinary batches of independent
+windows. Batch size, composition, and order are evaluator details rather than
+model-facing signals; submissions must not rely on temporal continuity or
+persistent state across ``predict`` calls.
+
 .. note:: Two datasets ship: ``Salter2024Emg2pose`` — the official corpus via
    the neuralbench ``emg/pose`` task — and the zero-dependency ``Simulated``
    smoke test.

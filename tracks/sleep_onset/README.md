@@ -8,7 +8,8 @@ short EEG window.
 - **Input:** torch tensor `(B, C, T)` on `meta["device"]`.
 - **Output:** `predict(X) -> (B,)` float latencies in seconds, capped at 600,
   with `meta["n_outputs"] = 1`.
-- **Evaluation:** causal and streamed. Each recording reaches `predict` one
+- **Evaluation:** model-facing inference is causal and streamed. Each recording
+  reaches `predict` one
   window at a time (`B = 1`), forward in time, and starts from a
   `copy.deepcopy` of your model whose optional `reset_state()` is called
   first: a model can adapt within a recording but carries nothing over to the
@@ -52,14 +53,21 @@ neuralbench eeg _sleep_onset_stream --prepare
 neuralbench eeg _sleep_onset_stream -m eegnet --debug
 ```
 
-Reference development results on Sleep-EDF with NeuralBench's batch
-`sleep_onset` task, not Codabench warm-up scores:
+Reference development results on the public Muse split with NeuralBench
+0.4.0. The metric is `test/wbmae_stream_mean`, the W-bMAE per recording
+averaged over test recording streams:
 
-| Baseline | bMAE (s) |
+| Baseline | W-bMAE (s) |
 |---|---|
-| Chance | 205.42 ± 0.01 |
-| EEGNet | 143.30 ± 0.40 |
-| REVE frozen probe | 134.89 ± 2.02 |
+| Constant 35 s, selected on validation | 60.7 |
+| EEGNet | 60.6 |
+| CTNet | 60.1 |
+| REVE fine-tuned | 72.9 |
+
+Model values are means over seeds 33, 34 and 35 with NeuralBench's current
+default MSE training. In a separate W-bMAE-aware L1 and sampling experiment,
+CTNet reached 57.2 s and REVE 55.9 s; those checkpoints are not part of the
+published EEGNet baseline archive.
 
 [Open the Track 03 NeuralBench guide](https://facebookresearch.github.io/neuroai/neuralbench/auto_examples/biosignal_challenge_2026/plot_track3_sleep_onset.html).
 After training its EEGNet, use the shared
